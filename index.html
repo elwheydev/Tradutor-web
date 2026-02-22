@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aprender Idiomas Pro</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background-size:cover;
+  background-position:center;
+  transition:0.5s;
+}
+
+.appBox{
+  max-width:420px;
+  margin:40px auto;
+  padding:20px;
+  border-radius:20px;
+  background:rgba(255,255,255,0.95);
+  box-shadow:0 10px 25px rgba(0,0,0,0.3);
+}
+
+h3{text-align:center;margin-top:0;}
+
+input, select{
+  width:100%;
+  padding:10px;
+  border-radius:10px;
+  border:1px solid #ccc;
+  margin-bottom:10px;
+}
+
+button{
+  width:100%;
+  padding:10px;
+  border:none;
+  border-radius:10px;
+  background:#000;
+  color:#fff;
+  cursor:pointer;
+  margin-bottom:8px;
+}
+
+.balao{
+  background:#000;
+  color:#fff;
+  padding:12px;
+  border-radius:15px;
+  margin-bottom:8px;
+}
+
+.progress{
+  height:10px;
+  background:#ddd;
+  border-radius:10px;
+  overflow:hidden;
+  margin-bottom:10px;
+}
+
+.progress-bar{
+  height:100%;
+  background:#4caf50;
+  width:0%;
+  transition:0.3s;
+}
+
+.savedBox{
+  max-height:120px;
+  overflow-y:auto;
+}
+</style>
+</head>
+
+<body onload="initApp()">
+
+<div class="appBox">
+
+<h3>🌎 Idiomas Pro</h3>
+
+<div>
+<b>XP:</b> <span id="xp">0</span> |
+<b>Nível:</b> <span id="nivel">🌱 Iniciante</span>
+</div>
+
+<div class="progress">
+  <div class="progress-bar" id="progressBar"></div>
+</div>
+
+<input type="text" id="word" placeholder="Digite uma palavra">
+
+<select id="targetLang" onchange="changeBackground()">
+  <option value="en">🇺🇸 Inglês</option>
+  <option value="es">🇪🇸 Espanhol</option>
+  <option value="fr">🇫🇷 Francês</option>
+  <option value="de">🇩🇪 Alemão</option>
+  <option value="it">🇮🇹 Italiano</option>
+  <option value="ru">🇷🇺 Russo</option>
+  <option value="ja">🇯🇵 Japonês</option>
+  <option value="ko">🇰🇷 Coreano</option>
+  <option value="zh-CN">🇨🇳 Chinês</option>
+</select>
+
+<button onclick="learnWord()">Traduzir</button>
+
+<div id="resultBox"></div>
+
+<hr>
+
+<h4>📚 Palavras Salvas</h4>
+<div id="savedWords" class="savedBox"></div>
+
+</div>
+
+<script>
+
+let xp = 0;
+
+function initApp(){
+  xp = parseInt(localStorage.getItem("xp")) || 0;
+  updateXP(0);
+  loadSaved();
+  changeBackground();
+}
+
+function addXP(points){
+  xp += points;
+  localStorage.setItem("xp", xp);
+  updateXP(0);
+}
+
+function updateXP(){
+  document.getElementById("xp").innerText = xp;
+
+  let nivel = "🌱 Iniciante";
+  if(xp >= 500) nivel = "📘 Estudante";
+  if(xp >= 1500) nivel = "📗 Intermediário";
+  if(xp >= 3000) nivel = "📙 Avançado";
+  if(xp >= 6000) nivel = "🏆 Poliglota";
+
+  document.getElementById("nivel").innerText = nivel;
+
+  let percent = (xp % 100);
+  document.getElementById("progressBar").style.width = percent + "%";
+}
+
+async function learnWord() {
+  const word = document.getElementById("word").value.trim();
+  const target = document.getElementById("targetLang").value;
+  if(!word) return;
+
+  document.getElementById("resultBox").innerHTML =
+    `<div class="balao">⏳ Traduzindo...</div>`;
+
+  try {
+    const res = await fetch(
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=pt&tl=${target}&dt=t&q=${encodeURIComponent(word)}`
+    );
+
+    const data = await res.json();
+    const translated = data[0][0][0];
+
+    const pronunciation = gerarPronunciaBR(translated, target);
+
+    addXP(5);
+
+    document.getElementById("resultBox").innerHTML = `
+      <div class="balao">${word}</div>
+      <div class="balao">${translated}</div>
+      <div class="balao">${pronunciation}</div>
+
+      <button onclick="speak('${translated}','${target}')">
+      🔊 Ouvir (+2 XP)
+      </button>
+
+      <button onclick="saveWord('${word}','${translated}','${pronunciation}')">
+      💾 Salvar (+3 XP)
+      </button>
+    `;
+
+  } catch {
+    document.getElementById("resultBox").innerHTML =
+      `<div class="balao">❌ Erro</div>`;
+  }
+}
+
+function speak(text, lang){
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = lang;
+  speechSynthesis.speak(utterance);
+  addXP(2);
+}
+
+function gerarPronunciaBR(word, lang){
+  let w = word.toLowerCase();
+
+  if(lang === "en"){
+    if(w === "apple") return "épou";
+    w = w.replace(/th/g,"d")
+         .replace(/sh/g,"x")
+         .replace(/ch/g,"tch")
+         .replace(/oo/g,"u")
+         .replace(/ee/g,"i")
+         .replace(/a/g,"é")
+         .replace(/e/g,"i")
+         .replace(/i/g,"ai")
+         .replace(/o/g,"ou");
+  }
+
+  return w;
+}
+
+function saveWord(original, translated, pronunciation){
+  let words = JSON.parse(localStorage.getItem("learnedWords")) || [];
+  words.push({original, translated, pronunciation});
+  localStorage.setItem("learnedWords", JSON.stringify(words));
+  addXP(3);
+  loadSaved();
+}
+
+function loadSaved(){
+  let words = JSON.parse(localStorage.getItem("learnedWords")) || [];
+  let html="";
+  words.forEach(w=>{
+    html+=`<div class="balao">${w.original} → ${w.translated}<br><small>${w.pronunciation}</small></div>`;
+  });
+  document.getElementById("savedWords").innerHTML=html;
+}
+
+function changeBackground(){
+  const lang = document.getElementById("targetLang").value;
+
+  const backgrounds = {
+    "en":"url('https://images.unsplash.com/photo-1505761671935-60b3a7427bad')",
+    "es":"url('https://images.unsplash.com/photo-1523731407965-2430cd12f5e4')",
+    "fr":"url('https://images.unsplash.com/photo-1502602898657-3e91760cbb34')",
+    "de":"url('https://images.unsplash.com/photo-1520986606214-8b456906c813')",
+    "it":"url('https://images.unsplash.com/photo-1509358271058-acd22cc93898')",
+    "ru":"url('https://images.unsplash.com/photo-1513326738677-b964603b136d')",
+    "ja":"url('https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e')",
+    "ko":"url('https://images.unsplash.com/photo-1549692520-acc6669e2f0c')",
+    "zh-CN":"url('https://images.unsplash.com/photo-1508804185872-d7badad00f7d')"
+  };
+
+  document.body.style.backgroundImage = backgrounds[lang];
+}
+
+</script>
+
+</body>
+</html>
